@@ -119,6 +119,12 @@
         #freeze-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(100, 200, 255, 0.4); border: 20px solid rgba(255,255,255,0.5); box-sizing: border-box; pointer-events: none; display: none; z-index: 40; backdrop-filter: blur(4px); }
         #speed-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; background: radial-gradient(circle, transparent 50%, rgba(255,255,255,0.2) 100%); transition: opacity 0.2s; z-index: 30;}
         #look-hint { position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); font-size: 18px; color: #fff; text-shadow: 0 0 10px #00f2fe; background: rgba(0,0,0,0.5); padding: 10px 20px; border-radius: 20px; border: 1px solid #00f2fe; pointer-events: none; opacity: 0.8; transition: opacity 0.5s; }
+
+        /* Settings Modal */
+        #settings-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(10, 10, 20, 0.95); padding: 30px; border-radius: 20px; border: 2px solid #d946ef; box-shadow: 0 0 40px rgba(217,70,239,0.5); z-index: 60; display: none; flex-direction: column; gap: 15px; width: 350px; pointer-events: auto; text-align: center; }
+        #settings-modal h2 { margin: 0 0 15px 0; color: #d946ef; text-shadow: 0 0 10px rgba(217,70,239,0.5); }
+        #btn-open-settings { position: absolute; top: 15px; left: 15px; background: transparent; border: none; font-size: 24px; cursor: pointer; transition: 0.2s; filter: drop-shadow(0 0 5px #00f2fe); }
+        #btn-open-settings:hover { transform: scale(1.2); }
     </style>
 </head>
 <body>
@@ -193,7 +199,8 @@
         
         <!-- Top Right: Controls & Leaderboard -->
         <div id="top-right-hud" class="hud-panel">
-            <h3 style="margin: 0 0 10px 0; color: #c4b5fd;">CONTROLS</h3>
+            <button id="btn-open-settings" title="Settings">⚙️</button>
+            <h3 style="margin: 0 0 10px 0; color: #c4b5fd; margin-left: 30px;">CONTROLS</h3>
             <p><span class="key">W A S D</span> Move</p>
             <p><span class="key">SHIFT</span> Sprint (Boosts Speed/Jump)</p>
             <p><span class="key">SPACE</span> Jump</p>
@@ -233,6 +240,21 @@
         </div>
 
         <div id="race-message">GO!</div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal">
+            <h2>SETTINGS</h2>
+            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 12px; border: 1px solid #334155;">
+                <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 12px; font-weight: bold;">ROOM CODE</p>
+                <div style="font-size: 28px; color: #00f2fe; font-weight: 900; letter-spacing: 5px;" id="settings-code">ABCD</div>
+                <button class="btn secondary" id="settings-copy-code" style="padding: 10px; font-size: 12px; margin-top: 10px;">COPY CODE</button>
+            </div>
+            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 12px; border: 1px solid #334155;">
+                <p style="margin: 0 0 5px 0; color: #94a3b8; font-size: 12px; font-weight: bold;">INVITE LINK</p>
+                <button class="btn secondary" id="settings-copy-link" style="padding: 10px; font-size: 12px; margin-top: 5px;">COPY LINK</button>
+            </div>
+            <button class="btn" id="settings-resume" style="margin-top: 10px;">RESUME GAME</button>
+        </div>
     </div>
 
     <!-- SCRIPTS -->
@@ -285,6 +307,7 @@
         var app, auth, db, myId = "", isHost = false, roomCode = "";
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'cyber-obby-v4';
         const remotePlayers = new Map(); 
+        var isSettingsOpen = false;
         
         var raceStarted = false; var raceFinished = false; var startTime = 0; var finishedTimeMs = 0; var leaderboard = [];
 
@@ -341,8 +364,9 @@
                     });
                 });
             } catch(e) {
-                console.warn("Firebase config not found, running offline mode.");
+                console.error("Firebase init failed:", e);
                 myId = "local_" + Math.random().toString(36).substr(2, 9);
+                alert("Multiplayer connection failed. Running in Offline Single-Player Mode.");
                 return true; 
             }
         }
@@ -841,6 +865,37 @@
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('room')) joinRoom(urlParams.get('room'));
 
+        // --- Settings Menu Logic ---
+        const btnOpenSettings = document.getElementById('btn-open-settings');
+        const settingsModal = document.getElementById('settings-modal');
+        const btnResume = document.getElementById('settings-resume');
+        const btnCopyCode = document.getElementById('settings-copy-code');
+        const btnCopyLink = document.getElementById('settings-copy-link');
+
+        if(btnOpenSettings) btnOpenSettings.addEventListener('click', () => {
+            isSettingsOpen = true;
+            settingsModal.style.display = 'flex';
+            document.getElementById('settings-code').innerText = roomCode;
+        });
+
+        if(btnResume) btnResume.addEventListener('click', () => {
+            isSettingsOpen = false;
+            settingsModal.style.display = 'none';
+        });
+
+        if(btnCopyCode) btnCopyCode.addEventListener('click', () => {
+            navigator.clipboard.writeText(roomCode);
+            btnCopyCode.innerText = "COPIED!";
+            setTimeout(() => btnCopyCode.innerText = "COPY CODE", 2000);
+        });
+
+        if(btnCopyLink) btnCopyLink.addEventListener('click', () => {
+            const link = window.location.href.split('?')[0] + "?room=" + roomCode;
+            navigator.clipboard.writeText(link);
+            btnCopyLink.innerText = "COPIED!";
+            setTimeout(() => btnCopyLink.innerText = "COPY LINK", 2000);
+        });
+
         function enterGame() {
             if (window.gameActive) return; window.gameActive = true;
             const lobby = document.getElementById('lobby'); if(lobby) lobby.style.display = 'none'; 
@@ -859,7 +914,7 @@
         // =========================================================
         const keys = {}; 
         window.addEventListener('keydown', e => { 
-            if (e.code === 'Enter' && window.gameActive) {
+            if (e.code === 'Enter' && window.gameActive && !isSettingsOpen) {
                 const input = document.getElementById('ig-chat-input');
                 const container = document.getElementById('ig-chat-input-container');
                 if (document.activeElement === input) {
@@ -868,7 +923,7 @@
                     window.isTyping = true; if(container) container.style.display = 'flex'; if(input) input.focus(); e.preventDefault();
                 }
             }
-            if (window.isTyping) return; 
+            if (window.isTyping || isSettingsOpen) return; 
             keys[e.code] = true; 
             if ((e.code === 'KeyE' || e.code === 'ShiftLeft') && window.gameActive) useItem();
         });
@@ -876,12 +931,12 @@
 
         var isDraggingCam = false;
         document.addEventListener('mousedown', (e) => { 
-            if(e.target.closest('#ui-container') || e.target.closest('#lobby')) return;
+            if(e.target.closest('#ui-container') || e.target.closest('#lobby') || isSettingsOpen) return;
             isDraggingCam = true; const hint = document.getElementById('look-hint'); if(hint) hint.style.opacity = '0'; 
         });
         document.addEventListener('mouseup', () => isDraggingCam = false);
         document.addEventListener('mousemove', (e) => {
-            if(isDraggingCam && window.gameActive && !isFrozen) {
+            if(isDraggingCam && window.gameActive && !isFrozen && !isSettingsOpen) {
                 camYaw -= e.movementX * 0.005; camPitch -= e.movementY * 0.005;
                 camPitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, camPitch));
             }
@@ -976,7 +1031,7 @@
                 }
             }
 
-            if (!isFrozen && !isStunned && !window.isTyping) {
+            if (!isFrozen && !isStunned && !window.isTyping && !isSettingsOpen) {
                 let speed = hasBoost ? MOVE_SPEED * 1.8 : (isSprinting ? SPRINT_SPEED : MOVE_SPEED);
                 
                 let moveX = 0; let moveZ = 0;
